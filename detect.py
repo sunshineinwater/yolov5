@@ -50,14 +50,14 @@ from utils.torch_utils import select_device, time_sync
 def run(
         weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         source=ROOT / 'data/images',  # file/dir/URL/glob, 0 for webcam
-        data=ROOT / 'data/coco128.yaml',  # dataset.yaml path
+        data=ROOT / 'data/coco128.yaml',  # dataset.yaml path  类别名称
         imgsz=(640, 640),  # inference size (height, width)
         conf_thres=0.25,  # confidence threshold
         iou_thres=0.45,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
-        view_img=False,  # show results
-        save_txt=False,  # save results to *.txt
+        view_img=True,  # show results
+        save_txt=True,  # save results to *.txt
         save_conf=False,  # save confidences in --save-txt labels
         save_crop=False,  # save cropped prediction boxes
         nosave=False,  # do not save images/videos
@@ -89,6 +89,7 @@ def run(
 
     # Load model
     device = select_device(device)
+    print("寻找name,data=", data)
     model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half)
     stride, names, pt = model.stride, model.names, model.pt
     imgsz = check_img_size(imgsz, s=stride)  # check image size
@@ -132,6 +133,8 @@ def run(
 
         # Process predictions
         for i, det in enumerate(pred):  # per image
+            print(f"预测结果:{det=}")
+
             seen += 1
             if webcam:  # batch_size >= 1
                 p, im0, frame = path[i], im0s[i].copy(), dataset.count
@@ -146,6 +149,7 @@ def run(
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
+
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
@@ -249,4 +253,6 @@ def main(opt):
 
 if __name__ == "__main__":
     opt = parse_opt()
+    opt.save_txt = True
+    opt.view_img = True
     main(opt)

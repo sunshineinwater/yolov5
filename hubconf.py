@@ -48,6 +48,7 @@ def _create(name, pretrained=True, channels=3, classes=80, autoshape=True, verbo
             # model = models.experimental.attempt_load(path, map_location=device)  # download/load FP32 model
         else:
             cfg = list((Path(__file__).parent / 'models').rglob(f'{path.stem}.yaml'))[0]  # model.yaml path
+            print(f"{cfg=}")
             model = Model(cfg, channels, classes)  # create model
             if pretrained:
                 ckpt = torch.load(attempt_download(path), map_location=device)  # load
