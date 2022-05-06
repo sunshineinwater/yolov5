@@ -2,15 +2,14 @@ import torch
 
 yaml_file = "/Users/zhangxuewei/Documents/GitHub/yolov5/data/Objects365.yaml"
 # Model
-model = torch.hub.load(
-    './', 'yolov5s',
-    source="local")  # or yolov5n - yolov5x6, custom
+# 在yolov5.models.common文件中DetectMultiBackend类的初始化函数中,if pt语句中读取了标签名
+model = torch.hub.load('./', 'yolov5s', source="local")  # or yolov5n - yolov5x6, custom
 # Images
 img = '/Users/zhangxuewei/Documents/GitHub/yolov5/data/images/pic.jpeg'  # or file, Path, PIL, OpenCV, numpy, list
 # Inference
 # model.yaml_file = "/Users/zhangxuewei/Documents/GitHub/yolov5/data/Objects365.yaml"
+# print(model.names)
 results = model(img)
-
 # Results
 results.print()  # or .show(), .save(), .crop(), .pandas(), etc.
 xx1 = results.xyxy[0]  # img1 predictions (tensor)

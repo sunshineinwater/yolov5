@@ -45,7 +45,7 @@ from utils.general import (LOGGER, check_file, check_img_size, check_imshow, che
 from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import select_device, time_sync
 
-
+#
 @torch.no_grad()
 def run(
         weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
@@ -133,8 +133,6 @@ def run(
 
         # Process predictions
         for i, det in enumerate(pred):  # per image
-            print(f"预测结果:{det=}")
-
             seen += 1
             if webcam:  # batch_size >= 1
                 p, im0, frame = path[i], im0s[i].copy(), dataset.count
@@ -160,6 +158,8 @@ def run(
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
                 # Write results
+                returnValue = det
+                # print(f"预测结果:{det.numpy()=}")
                 for *xyxy, conf, cls in reversed(det):
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
@@ -201,6 +201,7 @@ def run(
 
         # Print time (inference-only)
         LOGGER.info(f'{s}Done. ({t3 - t2:.3f}s)')
+        return returnValue # 返回预测结果
 
     # Print results
     t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
@@ -248,10 +249,36 @@ def parse_opt():
 
 def main(opt):
     check_requirements(exclude=('tensorboard', 'thop'))
-    run(**vars(opt))
-
+    det = run(**vars(opt))
+    return det
 
 if __name__ == "__main__":
+    """
+    [[        625,         354,         680,         442,     0.84517,           5],
+       [        392,         431,         491,         612,     0.80039,           5],
+       [        894,         575,         914,         632,     0.66678,           0],
+       [        462,         472,         555,         688,     0.63587,           5],
+       [        570,         484,         661,         695,     0.61975,           5],
+       [        222,         620,         244,         694,     0.61266,           0],
+       [        434,         394,         467,         420,     0.54751,           2],
+       [         20,         630,          48,         697,     0.54718,           0],
+       [        185,         613,         204,         666,     0.54256,           0],
+       [        507,         339,         552,         384,     0.52448,           5],
+       [        239,         568,         436,         694,     0.51528,           5],
+       [        327,         488,         389,         564,     0.49799,           5],
+       [        869,         251,         934,         310,     0.49778,          74],
+       [        510,         377,         549,         444,     0.46311,           5],
+       [        463,         374,         509,         425,     0.42346,           5],
+       [        123,         657,         147,         701,     0.39853,           0],
+       [        604,         310,         630,         349,     0.38837,           5],
+       [        496,         452,         543,         506,     0.38082,           2],
+       [        466,         409,         499,         432,     0.32753,           2],
+       [        202,         607,         220,         665,     0.28185,           0],
+       [        236,         569,         254,         621,     0.28033,           0],
+       [        492,         455,         541,         508,     0.26611,           5],
+       [        226,         607,         247,         658,     0.25443,           0],
+       [        595,         393,         611,         433,     0.25203,           0]]
+    """
     opt = parse_opt()
     opt.save_txt = True
     opt.view_img = True

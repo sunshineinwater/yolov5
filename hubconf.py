@@ -40,11 +40,15 @@ def _create(name, pretrained=True, channels=3, classes=80, autoshape=True, verbo
     check_requirements(exclude=('tensorboard', 'thop', 'opencv-python'))
     name = Path(name)
     path = name.with_suffix('.pt') if name.suffix == '' else name  # checkpoint path
+    print(f"{path=}")
+
     try:
         device = select_device(('0' if torch.cuda.is_available() else 'cpu') if device is None else device)
 
         if pretrained and channels == 3 and classes == 80:
+            # 此处model中含有分类标签名
             model = DetectMultiBackend(path, device=device)  # download/load FP32 model
+            print(f"{model.names=}")
             # model = models.experimental.attempt_load(path, map_location=device)  # download/load FP32 model
         else:
             cfg = list((Path(__file__).parent / 'models').rglob(f'{path.stem}.yaml'))[0]  # model.yaml path
@@ -56,6 +60,7 @@ def _create(name, pretrained=True, channels=3, classes=80, autoshape=True, verbo
                 csd = intersect_dicts(csd, model.state_dict(), exclude=['anchors'])  # intersect
                 model.load_state_dict(csd, strict=False)  # load
                 if len(ckpt['model'].names) == classes:
+                    # 标签名
                     model.names = ckpt['model'].names  # set class names attribute
         if autoshape:
             model = AutoShape(model)  # for file/URI/PIL/cv2/np inputs and NMS
@@ -136,10 +141,10 @@ if __name__ == '__main__':
 
     imgs = [
         'data/images/zidane.jpg',  # filename
-        Path('data/images/zidane.jpg'),  # Path
+        Path('data/image_backup/zidane.jpg'),  # Path
         'https://ultralytics.com/images/zidane.jpg',  # URI
-        cv2.imread('data/images/bus.jpg')[:, :, ::-1],  # OpenCV
-        Image.open('data/images/bus.jpg'),  # PIL
+        cv2.imread('data/image_backup/bus.jpg')[:, :, ::-1],  # OpenCV
+        Image.open('data/image_backup/bus.jpg'),  # PIL
         np.zeros((320, 640, 3))]  # numpy
 
     results = model(imgs, size=320)  # batched inference
