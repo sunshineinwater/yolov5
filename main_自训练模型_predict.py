@@ -15,4 +15,5 @@ opt.save_txt = False
 opt.view_img = False
 det = main(opt)
 
-print(toPandas(det))
+print(toPandas(det[0]))
+print(len(det))

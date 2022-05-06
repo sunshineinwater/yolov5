@@ -1,29 +1,7 @@
-# YOLOv5 🚀 by Ultralytics, GPL-3.0 license
-"""
-Run inference on images, videos, directories, streams, etc.
-
-Usage - sources:
-    $ python path/to/detect.py --weights yolov5s.pt --source 0              # webcam
-                                                             img.jpg        # image
-                                                             vid.mp4        # video
-                                                             path/          # directory
-                                                             path/*.jpg     # glob
-                                                             'https://youtu.be/Zgi9g1ksQHc'  # YouTube
-                                                             'rtsp://example.com/media.mp4'  # RTSP, RTMP, HTTP stream
-
-Usage - formats:
-    $ python path/to/detect.py --weights yolov5s.pt                 # PyTorch
-                                         yolov5s.torchscript        # TorchScript
-                                         yolov5s.onnx               # ONNX Runtime or OpenCV DNN with --dnn
-                                         yolov5s.xml                # OpenVINO
-                                         yolov5s.engine             # TensorRT
-                                         yolov5s.mlmodel            # CoreML (macOS-only)
-                                         yolov5s_saved_model        # TensorFlow SavedModel
-                                         yolov5s.pb                 # TensorFlow GraphDef
-                                         yolov5s.tflite             # TensorFlow Lite
-                                         yolov5s_edgetpu.tflite     # TensorFlow Edge TPU
-"""
-
+# 修改自 原生 detect文件
+# 修改内容:
+# 1. source传入图片地址 --改成--> 传入numpy.ndarray类型,torch图像格式的变量 , shape = [图片数量,深度,宽度,高度]
+# 2. run函数返回预测结果
 import argparse
 import os
 import sys
@@ -41,13 +19,13 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 from models.common import DetectMultiBackend
 from utils.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
+from 后加的.datasets import LoadImageFromArray
 from utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr, cv2,
                            increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
 from utils.plots import Annotator, colors, save_one_box
 from utils.torch_utils import select_device, time_sync
 
 
-#
 @torch.no_grad()
 def run(
         weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
@@ -78,17 +56,13 @@ def run(
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
 ):
-    if isinstance(source, np.ndarray):
-        # numpy单张图片
-        ...
-    else:
-        source = str(source)
-        save_img = not nosave and not source.endswith('.txt')  # save inference images
-        is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
-        is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
-        webcam = source.isnumeric() or source.endswith('.txt') or (is_url and not is_file)
-        if is_url and is_file:
-            source = check_file(source)  # download
+    source = str(source)
+    save_img = not nosave and not source.endswith('.txt')  # save inference images
+    is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
+    is_url = source.lower().startswith(('rtsp://', 'rtmp://', 'http://', 'https://'))
+    webcam = source.isnumeric() or source.endswith('.txt') or (is_url and not is_file)
+    if is_url and is_file:
+        source = check_file(source)  # download
 
     # Directories
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
@@ -115,15 +89,19 @@ def run(
     # Run inference
     model.warmup(imgsz=(1 if pt else bs, 3, *imgsz))  # warmup
     dt, seen = [0.0, 0.0, 0.0], 0
-
-    预测结果 = []  # 多张图片的预测结果
+    #
+    预测结果 = []
     for path, im, im0s, vid_cap, s in dataset:
+        # im: 缩放后的图片
+        # im0s:原始图片
+        # s: 可能是数量
         t1 = time_sync()
         im = torch.from_numpy(im).to(device)
         im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
         im /= 255  # 0 - 255 to 0.0 - 1.0
         if len(im.shape) == 3:
             im = im[None]  # expand for batch dim
+
         t2 = time_sync()
         dt[0] += t2 - t1
 
@@ -223,6 +201,169 @@ def run(
     return 预测结果  # 返回预测结果
 
 
+@torch.no_grad()
+def run_from图片变量(
+        weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
+        source=np.zeros((1, 640, 640, 3)),  # numpy数组类型,[ 图片数量 , cv2.imread BGR图像格式的数据]
+        data=ROOT / 'data/coco128.yaml',  # dataset.yaml path  类别名称
+        imgsz=(640, 640),  # inference size (height, width)
+        conf_thres=0.25,  # confidence threshold
+        iou_thres=0.45,  # NMS IOU threshold
+        max_det=1000,  # maximum detections per image
+        device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
+        view_img=True,  # show results
+        save_txt=True,  # save results to *.txt
+        save_conf=False,  # save confidences in --save-txt labels
+        save_crop=False,  # save cropped prediction boxes
+        nosave=False,  # do not save images/videos
+        classes=None,  # filter by class: --class 0, or --class 0 2 3
+        agnostic_nms=False,  # class-agnostic NMS
+        augment=False,  # augmented inference
+        visualize=False,  # visualize features
+        update=False,  # update all models
+        project=ROOT / 'runs/detect',  # save results to project/name
+        name='exp',  # save results to project/name
+        exist_ok=False,  # existing project/name ok, do not increment
+        line_thickness=3,  # bounding box thickness (pixels)
+        hide_labels=False,  # hide labels
+        hide_conf=False,  # hide confidences
+        half=False,  # use FP16 half-precision inference
+        dnn=False,  # use OpenCV DNN for ONNX inference
+):
+    # Directories
+    save_img = not nosave  # save inference images
+    save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
+    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+
+    # Load model
+    device = select_device(device)
+    # print("寻找name,data=", data)
+    model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half)
+    stride, names, pt = model.stride, model.names, model.pt
+    imgsz = check_img_size(imgsz, s=stride)  # check image size
+
+    # DataLoader - 读取图片
+    webcam = False
+    dataset = LoadImageFromArray(source, img_size=imgsz, stride=stride, auto=pt)
+    bs = 1  # batch_size
+    vid_path, vid_writer = [None] * bs, [None] * bs
+
+    # Run inference
+    model.warmup(imgsz=(1 if pt else bs, 3, *imgsz))  # warmup
+    dt, seen = [0.0, 0.0, 0.0], 0
+    #
+    预测结果 = []
+    for path, im, im0s, vid_cap, s in dataset:
+        # im: 缩放后的图片
+        # im0s:原始图片
+        # s: 可能是数量
+        t1 = time_sync()
+        im = torch.from_numpy(im).to(device)
+        im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
+        im /= 255  # 0 - 255 to 0.0 - 1.0
+        if len(im.shape) == 3:
+            im = im[None]  # expand for batch dim
+
+        t2 = time_sync()
+        dt[0] += t2 - t1
+
+        # Inference
+        visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
+        pred = model(im, augment=augment, visualize=visualize)
+        t3 = time_sync()
+        dt[1] += t3 - t2
+
+        # NMS
+        pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+        dt[2] += time_sync() - t3
+
+        # Second-stage classifier (optional)
+        # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
+
+        # Process predictions
+        for i, det in enumerate(pred):  # per image
+            seen += 1
+            if webcam:  # batch_size >= 1
+                p, im0, frame = path[i], im0s[i].copy(), dataset.count
+                s += f'{i}: '
+            else:
+                p, im0, frame = path, im0s.copy(), getattr(dataset, 'frame', 0)
+
+            p = Path(p)  # to Path
+            save_path = str(save_dir / p.name)  # im.jpg
+            txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
+            s += '%gx%g ' % im.shape[2:]  # print string
+            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+            imc = im0.copy() if save_crop else im0  # for save_crop
+            annotator = Annotator(im0, line_width=line_thickness, example=str(names))
+
+            if len(det):
+                # Rescale boxes from img_size to im0 size
+                det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
+
+                # Print results
+                for c in det[:, -1].unique():
+                    n = (det[:, -1] == c).sum()  # detections per class
+                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
+
+                # Write results
+                预测结果.append(det)
+                # print(f"预测结果:{det.numpy()=}")
+                for *xyxy, conf, cls in reversed(det):
+                    if save_txt:  # Write to file
+                        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                        line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
+                        with open(txt_path + '.txt', 'a') as f:
+                            f.write(('%g ' * len(line)).rstrip() % line + '\n')
+
+                    if save_img or save_crop or view_img:  # Add bbox to image
+                        c = int(cls)  # integer class
+                        label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
+                        annotator.box_label(xyxy, label, color=colors(c, True))
+                        if save_crop:
+                            save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+
+            # Stream results
+            im0 = annotator.result()
+            if view_img:
+                cv2.imshow(str(p), im0)
+                cv2.waitKey(1)  # 1 millisecond
+
+            # Save results (image with detections)
+            if save_img:
+                if dataset.mode == 'image':
+                    print(f"{save_path=}")
+                    cv2.imwrite(save_path, im0)
+                else:  # 'video' or 'stream'
+                    if vid_path[i] != save_path:  # new video
+                        vid_path[i] = save_path
+                        if isinstance(vid_writer[i], cv2.VideoWriter):
+                            vid_writer[i].release()  # release previous video writer
+                        if vid_cap:  # video
+                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
+                            w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                            h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                        else:  # stream
+                            fps, w, h = 30, im0.shape[1], im0.shape[0]
+                        save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
+                        vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                    vid_writer[i].write(im0)
+
+        # Print time (inference-only)
+        LOGGER.info(f'{s}Done. ({t3 - t2:.3f}s)')
+
+    # Print results
+    t = tuple(x / seen * 1E3 for x in dt)  # speeds per image
+    LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
+    if save_txt or save_img:
+        s = f"\n{len(list(save_dir.glob('labels/*.txt')))} labels saved to {save_dir / 'labels'}" if save_txt else ''
+        LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
+    if update:
+        strip_optimizer(weights)  # update model (to fix SourceChangeWarning)
+
+    return 预测结果  # 返回预测结果
+
+
 def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'yolov5s.pt', help='model path(s)')
@@ -258,39 +399,25 @@ def parse_opt():
 
 
 def main(opt):
-    check_requirements(exclude=('tensorboard', 'thop'))
-    det = run(**vars(opt))
-    return det
+    # check_requirements(exclude=('tensorboard', 'thop'))
+    return run(**vars(opt))
+
+
+def main_图片变量(opt):
+    return run_from图片变量(**vars(opt))
 
 
 if __name__ == "__main__":
-    """
-    [[        625,         354,         680,         442,     0.84517,           5],
-       [        392,         431,         491,         612,     0.80039,           5],
-       [        894,         575,         914,         632,     0.66678,           0],
-       [        462,         472,         555,         688,     0.63587,           5],
-       [        570,         484,         661,         695,     0.61975,           5],
-       [        222,         620,         244,         694,     0.61266,           0],
-       [        434,         394,         467,         420,     0.54751,           2],
-       [         20,         630,          48,         697,     0.54718,           0],
-       [        185,         613,         204,         666,     0.54256,           0],
-       [        507,         339,         552,         384,     0.52448,           5],
-       [        239,         568,         436,         694,     0.51528,           5],
-       [        327,         488,         389,         564,     0.49799,           5],
-       [        869,         251,         934,         310,     0.49778,          74],
-       [        510,         377,         549,         444,     0.46311,           5],
-       [        463,         374,         509,         425,     0.42346,           5],
-       [        123,         657,         147,         701,     0.39853,           0],
-       [        604,         310,         630,         349,     0.38837,           5],
-       [        496,         452,         543,         506,     0.38082,           2],
-       [        466,         409,         499,         432,     0.32753,           2],
-       [        202,         607,         220,         665,     0.28185,           0],
-       [        236,         569,         254,         621,     0.28033,           0],
-       [        492,         455,         541,         508,     0.26611,           5],
-       [        226,         607,         247,         658,     0.25443,           0],
-       [        595,         393,         611,         433,     0.25203,           0]]
-    """
+    import cv2
+
     opt = parse_opt()
-    opt.save_txt = True
-    opt.view_img = True
-    main(opt)
+    #
+    opt.weights = "/Users/zhangxuewei/Documents/GitHub/yolov5/yolov5s_backup.pt"  # 模型参数
+    opt.source = cv2.imread("/Users/zhangxuewei/Documents/GitHub/yolov5/data/images/pic.jpeg")  # 识别对象
+    opt.data = "/Users/zhangxuewei/Documents/GitHub/yolov5/data/coco128.yaml"  # 类别名
+    opt.save_txt = False
+    opt.view_img = False
+    opt.nosave = True   # 不保存识别效果图
+    #
+    det = main_图片变量(opt)
+    print(det)
